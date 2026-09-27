@@ -1,0 +1,15 @@
+// A playground's files: created from its template's starter files along with the playground,
+// then saved by the editor (autosave and "Save and close").
+model PlaygroundFile {
+  id           String     @id @default(cuid())
+  playgroundId String     @map("playground_id")
+  playground   Playground @relation(fields: [playgroundId], references: [id], onDelete: Cascade)
+  // Relative to the project root, e.g. "src/App.jsx".
+  path         String
+  content      String
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@unique([playgroundId, path])
+  @@map("playground_file")
+}
