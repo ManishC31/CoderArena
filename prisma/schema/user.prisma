@@ -1,0 +1,32 @@
+// How the user first signed up. Linking another method later doesn't change it.
+enum AuthType {
+  email
+  google
+
+  @@map("auth_type")
+}
+
+enum Role {
+  admin
+  user
+  premium_user
+
+  @@map("user_role")
+}
+
+// Passwords are not stored here — Better Auth keeps the hash on the credential row in `account`.
+model User {
+  id            String        @id
+  name          String
+  email         String        @unique
+  emailVerified Boolean       @default(false) @map("email_verified")
+  image         String?
+  authType      AuthType      @default(email) @map("auth_type")
+  role          Role          @default(user)
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  sessions      Session[]
+  accounts      Account[]
+
+  @@map("user")
+}

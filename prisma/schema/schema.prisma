@@ -1,0 +1,12 @@
+// Prisma schema — https://pris.ly/d/prisma-schema
+// Connection URL lives in prisma.config.ts (DATABASE_URL).
+// Each table has its own .prisma file in this folder.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
