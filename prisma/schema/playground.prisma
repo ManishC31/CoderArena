@@ -1,0 +1,29 @@
+// Sandbox templates offered in the "Create a playground" dialog.
+// Keep in sync with src/lib/sandbox-templates.ts (its ids are typed from this enum).
+enum PlaygroundTemplate {
+  react
+  nextjs
+  vue
+  angular
+  express
+  hono
+
+  @@map("playground_template")
+}
+
+model Playground {
+  id          String             @id @default(cuid())
+  title       String
+  description String?
+  template    PlaygroundTemplate
+  // Starred by its owner, so it can be pinned to the top of their list.
+  starred     Boolean            @default(false)
+  userId      String             @map("user_id")
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  files       PlaygroundFile[]
+  createdAt   DateTime           @default(now()) @map("created_at")
+  updatedAt   DateTime           @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@map("playground")
+}

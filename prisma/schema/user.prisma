@@ -27,6 +27,8 @@ model User {
   updatedAt     DateTime      @updatedAt @map("updated_at")
   sessions      Session[]
   accounts      Account[]
+  playgrounds   Playground[]
+  editorConfig  EditorConfig?
 
   @@map("user")
 }
