@@ -5,7 +5,7 @@ import { defineConfig, env } from "prisma/config";
 loadEnvConfig(process.cwd());
 
 export default defineConfig({
-  schema: "prisma/schema.prisma",
+  schema: "prisma/schema",
   migrations: {
     path: "prisma/migrations",
   },
