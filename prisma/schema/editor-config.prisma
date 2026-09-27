@@ -1,0 +1,15 @@
+// Each user's editor preferences (the settings menu in the playground). One row per user,
+// created the first time they change a setting; until then the app uses the defaults.
+// Values are ids from src/components/playground/editor-settings.ts, validated by the app.
+model EditorConfig {
+  id        String   @id @default(cuid())
+  userId    String   @unique @map("user_id")
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  themeId   String   @default("vs-dark-plus") @map("theme_id")
+  fontId    String   @default("jetbrains-mono") @map("font_id")
+  fontSize  Int      @default(14) @map("font_size")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("editor_config")
+}

@@ -13,7 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "CodeArena",
+  title: {
+    default: "CodeArena",
+    template: "%s · CodeArena",
+  },
+  description: "Solve coding challenges in a fast, in-browser editor.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
