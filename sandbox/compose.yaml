@@ -1,0 +1,21 @@
+# Dev sandbox host: Docker + gVisor in a privileged container (see sandbox/README.md).
+# Start it with `npm run sandbox:host`.
+name: coderarena-sandbox
+
+services:
+  host:
+    build: ./host
+    privileged: true
+    environment:
+      # Plain TCP without TLS: both ports are only published on this machine's loopback.
+      DOCKER_TLS_CERTDIR: ""
+    command: ["--tls=false"]
+    ports:
+      - "127.0.0.1:2375:2375"
+      # Sandbox preview ports; keep in sync with SANDBOX_PORT_RANGE in .env.example.
+      - "127.0.0.1:42000-42019:42000-42019"
+    volumes:
+      - docker-data:/var/lib/docker
+
+volumes:
+  docker-data:

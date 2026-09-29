@@ -149,14 +149,48 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
 `,
       },
       {
+        path: "next.config.ts",
+        content: `import type { NextConfig } from "next";
+
+// Settings the editor's preview needs; keep them, or the preview won't load.
+const nextConfig: NextConfig = {
+  // The preview serves the app under a sub-path, which the sandbox passes in.
+  basePath: process.env.PREVIEW_BASE_PATH,
+  experimental: {
+    // This dev-only feature waits for a WebSocket the preview can't open, which stops the
+    // page from becoming interactive.
+    reactDebugChannel: false,
+  },
+};
+
+export default nextConfig;
+`,
+      },
+      {
         path: "app/page.tsx",
-        content: `export default function Page() {
+        content: `import { Counter } from "./counter";
+
+export default function Page() {
   return (
     <main>
       <h1>Hello from Next.js</h1>
       <p>Edit app/page.tsx to get started.</p>
+      <Counter />
     </main>
   );
+}
+`,
+      },
+      {
+        path: "app/counter.tsx",
+        content: `"use client";
+
+import { useState } from "react";
+
+export function Counter() {
+  const [count, setCount] = useState(0);
+
+  return <button onClick={() => setCount((c) => c + 1)}>Clicked {count} times</button>;
 }
 `,
       },
