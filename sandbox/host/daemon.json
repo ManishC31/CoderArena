@@ -1,0 +1,8 @@
+{
+  "icc": false,
+  "runtimes": {
+    "runsc": {
+      "path": "/usr/local/bin/runsc"
+    }
+  }
+}
