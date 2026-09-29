@@ -6,6 +6,7 @@ import { PlaygroundWorkspace } from "@/components/playground/playground-workspac
 import { templateFiles } from "@/components/playground/template-files";
 import { getEditorSettings } from "@/lib/editor-config";
 import { prisma } from "@/lib/prisma";
+import { canRunInSandbox } from "@/lib/sandbox/sandbox";
 import { sandboxTemplates } from "@/lib/sandbox-templates";
 import { requireSession } from "@/lib/session";
 
@@ -57,10 +58,12 @@ export default async function PlaygroundPage({ params }: PageProps<"/playground/
       playgroundId={playground.id}
       title={playground.title}
       icon={template && <BrandIcon icon={template.icon} color={template.color} className="size-4" />}
+      user={{ name: user.name, email: user.email, image: user.image ?? null }}
       files={files}
       savedAt={playground.updatedAt.getTime()}
       entry={entry}
       initialSettings={editorSettings}
+      canPreview={canRunInSandbox(playground.template)}
     />
   );
 }

@@ -57,7 +57,7 @@ export function LoginForm({ callbackUrl, oauthError }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-xl">Log in to CodeArena</CardTitle>
+        <CardTitle className="text-xl">Log in to CoderArena</CardTitle>
         <CardDescription>Welcome back. Pick up where you left off.</CardDescription>
       </CardHeader>
 

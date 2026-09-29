@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import { GitBranch, Lock } from "lucide-react";
 import { siGithub } from "simple-icons";
 import { BrandIcon } from "@/components/brand-icon";
-import { ActionCard } from "@/components/dashboard/action-card";
+import { ComingSoonBadge } from "@/components/coming-soon-badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -14,6 +14,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +22,9 @@ import { Label } from "@/components/ui/label";
 // github.com/owner/repo, with or without https://, www. or a trailing .git
 const GITHUB_REPO_URL = /^(https?:\/\/)?(www\.)?github\.com\/[\w.-]+\/[\w.-]+?(\.git)?\/?$/i;
 
-export function OpenRepositoryCard() {
+// "Import from GitHub": clone a repository into a new playground. Not wired up yet, so
+// submitting is disabled.
+export function OpenRepositoryDialog({ trigger }: { trigger: React.ReactElement }) {
   const [url, setUrl] = useState("");
   const isValid = GITHUB_REPO_URL.test(url.trim());
   const showError = url.trim() !== "" && !isValid;
@@ -33,31 +36,15 @@ export function OpenRepositoryCard() {
 
   return (
     <Dialog onOpenChange={(open) => open && setUrl("")}>
-      <ActionCard
-        icon={
-          <span className="flex size-11 items-center justify-center rounded-xl bg-foreground text-background">
-            <BrandIcon icon={siGithub} />
-          </span>
-        }
-        title="Open a GitHub repository"
-        description="Clone a repository and keep working on it here."
-        actionLabel="Import repository"
-      >
-        <div className="flex items-center gap-2 rounded-lg border bg-background px-3 py-2 font-mono text-xs text-muted-foreground">
-          <BrandIcon icon={siGithub} className="size-3.5" />
-          <span className="truncate">
-            github.com/<span className="text-foreground">owner</span>/
-            <span className="text-foreground">repository</span>
-          </span>
-        </div>
-      </ActionCard>
+      <DialogTrigger render={trigger} />
 
       <DialogContent className="max-h-[calc(100svh-2rem)] gap-5 overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Open a GitHub repository</DialogTitle>
-          <DialogDescription>
-            Paste a repository URL and we&apos;ll clone it into a new playground.
-          </DialogDescription>
+          <DialogTitle className="flex items-center gap-2">
+            Import from GitHub
+            <ComingSoonBadge />
+          </DialogTitle>
+          <DialogDescription>Paste a repository URL to clone it into a new playground.</DialogDescription>
         </DialogHeader>
 
         <form id="open-repository" onSubmit={handleSubmit} className="grid gap-4">
@@ -113,12 +100,10 @@ export function OpenRepositoryCard() {
             <Lock className="size-4 shrink-0 text-muted-foreground" />
             <div className="flex-1">
               <p className="text-sm font-medium">Private repository?</p>
-              <p className="text-xs text-muted-foreground">
-                Connect your GitHub account to clone private repositories.
-              </p>
+              <p className="text-xs text-muted-foreground">Connect your GitHub account to clone private repositories.</p>
             </div>
             {/* TODO: start the GitHub account connection. */}
-            <Button type="button" variant="outline" size="sm">
+            <Button type="button" variant="outline" size="sm" disabled>
               <BrandIcon icon={siGithub} className="size-3.5" />
               Connect
             </Button>
@@ -127,7 +112,7 @@ export function OpenRepositoryCard() {
 
         <DialogFooter>
           <DialogClose render={<Button variant="outline" />}>Cancel</DialogClose>
-          <Button type="submit" form="open-repository" disabled={!isValid}>
+          <Button type="submit" form="open-repository" disabled>
             Clone repository
           </Button>
         </DialogFooter>

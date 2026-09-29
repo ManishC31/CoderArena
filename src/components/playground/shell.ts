@@ -199,7 +199,7 @@ export function createShell({ write, clear, getFiles }: ShellOptions) {
 
   return {
     start() {
-      write(`${DIM}CodeArena terminal. Type "help" to see the available commands.${RESET}\r\n`);
+      write(`${DIM}CoderArena terminal. Type "help" to see the available commands.${RESET}\r\n`);
       write(prompt());
     },
 
