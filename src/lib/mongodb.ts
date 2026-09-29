@@ -16,5 +16,5 @@ export const mongoClient = globalForMongo.mongoClient ?? createMongoClient();
 
 if (process.env.NODE_ENV !== "production") globalForMongo.mongoClient = mongoClient;
 
-// Database named in MONGODB_URI (e.g. mongodb://localhost:27017/codearena).
+// Database named in MONGODB_URI (e.g. mongodb://localhost:27017/coderarena).
 export const mongo = mongoClient.db();

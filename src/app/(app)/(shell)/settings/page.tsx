@@ -32,7 +32,7 @@ export default async function SettingsPage() {
       <Card className="max-w-2xl">
         <CardHeader>
           <CardTitle>Account</CardTitle>
-          <CardDescription>Your CodeArena account details.</CardDescription>
+          <CardDescription>Your CoderArena account details.</CardDescription>
         </CardHeader>
         <CardContent>
           <dl className="divide-y">

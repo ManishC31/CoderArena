@@ -7,6 +7,8 @@ import { isValidFilePath, type PlaygroundFile } from "@/components/playground/fi
 import { templateFiles } from "@/components/playground/template-files";
 import { saveEditorSettings } from "@/lib/editor-config";
 import { prisma } from "@/lib/prisma";
+import { previewOrigin } from "@/lib/sandbox/preview-server";
+import { runSandbox, SandboxError, stopSandbox } from "@/lib/sandbox/sandbox";
 import { sandboxTemplates } from "@/lib/sandbox-templates";
 import { requireSession } from "@/lib/session";
 
@@ -61,6 +63,37 @@ export async function setPlaygroundStarred(playgroundId: string, starred: boolea
   refresh();
 }
 
+export type RenamePlaygroundState = { error: string } | { ok: true } | null;
+
+// Renames one of the signed-in user's playgrounds, then re-renders the page.
+export async function renamePlayground(
+  _previousState: RenamePlaygroundState,
+  formData: FormData,
+): Promise<RenamePlaygroundState> {
+  const { user } = await requireSession();
+  const playgroundId = formData.get("playgroundId");
+  const title = String(formData.get("title") ?? "").trim().slice(0, MAX_TITLE_LENGTH);
+  if (typeof playgroundId !== "string") throw new Error("Invalid input");
+  if (!title) return { error: "Enter a name." };
+
+  await prisma.playground.updateMany({ where: { id: playgroundId, userId: user.id }, data: { title } });
+  refresh();
+  return { ok: true };
+}
+
+// Deletes one of the signed-in user's playgrounds and its files, and stops its sandbox.
+export async function deletePlayground(playgroundId: string) {
+  const { user } = await requireSession();
+  if (typeof playgroundId !== "string") throw new Error("Invalid input");
+
+  // deleteMany so the userId check is part of the query; files go with it (onDelete: Cascade).
+  const { count } = await prisma.playground.deleteMany({ where: { id: playgroundId, userId: user.id } });
+  if (count > 0) {
+    await stopSandbox(playgroundId).catch((error) => console.error("Couldn't stop the sandbox", error));
+  }
+  refresh();
+}
+
 const MAX_FILES = 200;
 const MAX_FILE_LENGTH = 500_000;
 
@@ -101,4 +134,43 @@ export async function savePlaygroundFiles(playgroundId: string, files: Playgroun
     ),
   ]);
   return { savedAt: savedAt.getTime() };
+}
+
+export type RunPlaygroundResult = { previewUrl: string } | { error: string; logs?: string };
+
+// Runs one of the signed-in user's playgrounds in its sandbox with the editor's current files
+// (saved or not), and returns the URL of its preview.
+export async function runPlayground(playgroundId: string, files: PlaygroundFile[]): Promise<RunPlaygroundResult> {
+  const { user } = await requireSession();
+  if (typeof playgroundId !== "string" || !isValidFileList(files)) throw new Error("Invalid files");
+
+  const playground = await prisma.playground.findFirst({
+    where: { id: playgroundId, userId: user.id },
+    select: { template: true },
+  });
+  if (!playground) throw new Error("Playground not found");
+
+  try {
+    const { previewUrl } = await runSandbox({ playgroundId, userId: user.id, template: playground.template, files });
+    // In development the preview comes from its own port (see preview-server.ts).
+    return { previewUrl: `${(await previewOrigin()) ?? ""}${previewUrl}` };
+  } catch (error) {
+    if (error instanceof SandboxError) return { error: error.message, logs: error.logs };
+    console.error("Couldn't run the playground", error);
+    return { error: "Couldn't start the preview." };
+  }
+}
+
+// Stops the sandbox of one of the signed-in user's playgrounds.
+export async function stopPlayground(playgroundId: string) {
+  const { user } = await requireSession();
+  if (typeof playgroundId !== "string") throw new Error("Invalid input");
+
+  const playground = await prisma.playground.findFirst({
+    where: { id: playgroundId, userId: user.id },
+    select: { id: true },
+  });
+  if (!playground) throw new Error("Playground not found");
+
+  await stopSandbox(playgroundId);
 }

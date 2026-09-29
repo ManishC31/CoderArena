@@ -2,10 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { LoaderCircle, Save, SquareTerminal, X } from "lucide-react";
+import { MonitorPlay, SquareTerminal, X } from "lucide-react";
 import type * as Monaco from "monaco-editor";
 import type { PanelImperativeHandle, PanelSize } from "react-resizable-panels";
 import { updateEditorSettings } from "@/app/(app)/playground/actions";
+import type { MenuUser } from "@/components/app-shell/user-avatar";
 import { EditorLoading } from "@/components/playground/editor-loading";
 import { FONT_FAMILIES } from "@/components/playground/editor-fonts";
 import type { EditorSettings } from "@/components/playground/editor-settings";
@@ -15,9 +16,12 @@ import { FileExplorer } from "@/components/playground/file-explorer";
 import { FileIcon } from "@/components/playground/file-icon";
 import { languageForPath, type PlaygroundFile } from "@/components/playground/files";
 import { LeaveDialog } from "@/components/playground/leave-dialog";
-import { latestContents, useAutosave, type SaveStatus } from "@/components/playground/use-autosave";
+import { PreviewPanel } from "@/components/playground/preview-panel";
+import { StatusBar } from "@/components/playground/status-bar";
+import { latestContents, useAutosave } from "@/components/playground/use-autosave";
 import { useLeaveGuard } from "@/components/playground/use-leave-guard";
-import { Button } from "@/components/ui/button";
+import { usePreview } from "@/components/playground/use-preview";
+import { WorkspaceHeader } from "@/components/playground/workspace-header";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { cn } from "@/lib/utils";
 
@@ -32,18 +36,15 @@ const TerminalView = dynamic(
 );
 
 const DEFAULT_TERMINAL_SIZE = "30%";
-
-const SAVE_STATUS_TEXT: Record<Exclude<SaveStatus, "error">, string> = {
-  saved: "All changes saved",
-  unsaved: "Unsaved changes",
-  saving: "Saving…",
-};
+const DEFAULT_PREVIEW_SIZE = "40%";
 
 type Props = {
   playgroundId: string;
   title: string;
   // Template logo shown before the title.
   icon?: React.ReactNode;
+  // The signed-in user, for the account menu.
+  user: MenuUser;
   // The playground's saved files.
   files: PlaygroundFile[];
   // When they were saved (the playground's updated_at), in ms.
@@ -52,18 +53,22 @@ type Props = {
   entry: string;
   // The user's saved preferences from the editor_config table, so the first render already uses them.
   initialSettings: EditorSettings;
+  // Whether the template can run in a sandbox, which shows the preview panel.
+  canPreview: boolean;
 };
 
-// VS Code-style workspace under a title bar: file explorer | editor tabs + Monaco,
-// with a toggleable terminal below.
+// Full-screen VS Code-style workspace: a header, then file explorer | editor tabs + Monaco,
+// with a toggleable terminal below | the running app's preview, then a status bar.
 export function PlaygroundWorkspace({
   playgroundId,
   title,
   icon,
+  user,
   files,
   savedAt,
   entry,
   initialSettings,
+  canPreview,
 }: Props) {
   // The page's files, or newer ones this tab saved (see latestContents).
   const [initialContents] = useState(() => latestContents(playgroundId, files, savedAt));
@@ -87,6 +92,10 @@ export function PlaygroundWorkspace({
   const contents = useRef(new Map(initialContents));
   const getFiles = useCallback(() => Object.fromEntries(contents.current), []);
   const getContents = useCallback(() => contents.current, []);
+  const currentFiles = useCallback(
+    () => [...contents.current].map(([path, content]) => ({ path, content })),
+    [],
+  );
   const modelUri = (path: string) => `file:///playgrounds/${playgroundId}/${path}`;
 
   // Monaco keeps models in memory across page visits. On the first mount, reset any left
@@ -105,6 +114,8 @@ export function PlaygroundWorkspace({
   // "Save and close" is saving the last changes before leaving.
   const [closing, setClosing] = useState(false);
 
+  const preview = usePreview(playgroundId, currentFiles);
+
   // Until autosave catches up, the Back button and links open the leave dialog instead of
   // leaving, and closing the tab asks first. `leaveDestination` is where the user was headed.
   const [leaveDestination, setLeaveDestination] = useState<string | null>(null);
@@ -113,6 +124,7 @@ export function PlaygroundWorkspace({
   function handleChange(path: string, value: string) {
     contents.current.set(path, value);
     autosave.markChanged();
+    preview.scheduleUpdate();
   }
 
   // Saves whatever autosave hasn't yet, then leaves.
@@ -162,6 +174,33 @@ export function PlaygroundWorkspace({
     else panel.collapse();
   }, []);
 
+  // The preview panel also collapses to 0px when hidden. Opening it runs the playground.
+  const previewPanel = useRef<PanelImperativeHandle>(null);
+  const lastPreviewSize = useRef(DEFAULT_PREVIEW_SIZE);
+  const [previewOpen, setPreviewOpen] = useState(false);
+
+  function handlePreviewResize(size: PanelSize) {
+    const open = size.inPixels > 0;
+    if (open && !previewOpen) preview.start();
+    setPreviewOpen(open);
+    if (open) lastPreviewSize.current = `${size.asPercentage}%`;
+  }
+
+  const togglePreview = useCallback(() => {
+    const panel = previewPanel.current;
+    if (!panel) return;
+    if (panel.isCollapsed()) panel.resize(lastPreviewSize.current);
+    else panel.collapse();
+  }, []);
+
+  // The header's Run button: opening the preview panel starts the sandbox; if it's already
+  // open (stopped or failed), run it again.
+  function runPreview() {
+    const panel = previewPanel.current;
+    if (panel?.isCollapsed()) panel.resize(lastPreviewSize.current);
+    else preview.run();
+  }
+
   // Ctrl+` toggles the terminal, as in VS Code.
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -188,142 +227,177 @@ export function PlaygroundWorkspace({
   } as React.CSSProperties;
 
   return (
-    // Fills the viewport under the 3.5rem navbar.
-    <div className="flex h-[calc(100svh-3.5rem)] flex-col">
-      <div className="flex h-11 shrink-0 items-center gap-2.5 border-b bg-background px-4">
-        {icon}
-        <h1 className="truncate text-sm font-medium">{title}</h1>
-        <Button variant="outline" size="sm" disabled={closing} onClick={() => saveAndClose()}>
-          {closing ? <LoaderCircle className="animate-spin" /> : <Save />}
-          {closing ? "Saving…" : "Save and close"}
-        </Button>
-        {autosave.status === "error" ? (
-          <p role="alert" className="text-xs text-destructive">
-            Couldn&apos;t save your changes. Retrying…
-          </p>
-        ) : (
-          !closing && <span className="text-xs text-muted-foreground">{SAVE_STATUS_TEXT[autosave.status]}</span>
-        )}
-      </div>
+    // Fills the viewport; signed-in pages outside the editor have the sidebar instead.
+    <div className="flex h-svh flex-col">
+      <WorkspaceHeader
+        title={title}
+        icon={icon}
+        user={user}
+        saveStatus={autosave.status}
+        closing={closing}
+        onSaveAndClose={() => saveAndClose()}
+        preview={canPreview ? { state: preview.state, onRun: runPreview, onStop: preview.stop } : undefined}
+      />
 
-      <ResizablePanelGroup
-        orientation="horizontal"
-        style={themeStyle}
-        className="min-h-0 flex-1 bg-(--ws-editor) text-(--ws-fg)"
-      >
-        <ResizablePanel defaultSize="20%" minSize="12%" maxSize="45%" collapsible>
-          <FileExplorer paths={paths} activePath={activePath} onOpen={openFile} />
-        </ResizablePanel>
-        <ResizableHandle className="bg-(--ws-border)" />
+      <div style={themeStyle} className="flex min-h-0 flex-1 flex-col bg-(--ws-editor) text-(--ws-fg)">
+        <ResizablePanelGroup orientation="horizontal" className="min-h-0 flex-1">
+          <ResizablePanel defaultSize="20%" minSize="12%" maxSize="45%" collapsible>
+            <FileExplorer paths={paths} activePath={activePath} onOpen={openFile} />
+          </ResizablePanel>
+          <ResizableHandle className="bg-(--ws-border)" />
 
-        <ResizablePanel minSize="30%">
-          <ResizablePanelGroup orientation="vertical">
-            <ResizablePanel minSize="20%">
-              <div className="flex h-full flex-col">
-                <div className="flex h-9 shrink-0 border-b border-(--ws-border) bg-(--ws-sidebar)">
-                  <div className="flex min-w-0 flex-1 overflow-x-auto">
-                    {openPaths.map((path) => {
-                      const name = path.split("/").pop();
-                      const active = path === activePath;
-                      return (
-                        <div
-                          key={path}
-                          className={cn(
-                            "group flex shrink-0 items-center gap-1 border-r border-(--ws-border) pr-1.5 pl-3 text-xs",
-                            active ? "bg-(--ws-editor) text-(--ws-fg)" : "text-(--ws-muted) hover:bg-(--ws-hover)",
-                          )}
-                        >
-                          <button
-                            type="button"
-                            title={path}
-                            onClick={() => setActivePath(path)}
-                            className="flex h-full items-center gap-2 pr-1 outline-none"
-                          >
-                            <FileIcon path={path} className="size-3.5" />
-                            {name}
-                          </button>
-                          <button
-                            type="button"
-                            aria-label={`Close ${name}`}
-                            onClick={() => closeFile(path)}
+          <ResizablePanel minSize="30%">
+            <ResizablePanelGroup orientation="vertical">
+              <ResizablePanel minSize="20%">
+                <div className="flex h-full flex-col">
+                  <div className="flex h-9 shrink-0 border-b border-(--ws-border) bg-(--ws-sidebar)">
+                    <div className="flex min-w-0 flex-1 overflow-x-auto">
+                      {openPaths.map((path) => {
+                        const name = path.split("/").pop();
+                        const active = path === activePath;
+                        return (
+                          <div
+                            key={path}
                             className={cn(
-                              "rounded p-0.5 outline-none hover:bg-(--ws-active) focus-visible:opacity-100",
-                              active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                              "group flex shrink-0 items-center gap-1 border-r border-(--ws-border) pr-1.5 pl-3 text-xs",
+                              active ? "bg-(--ws-editor) text-(--ws-fg)" : "text-(--ws-muted) hover:bg-(--ws-hover)",
                             )}
                           >
-                            <X className="size-3.5" />
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={toggleTerminal}
-                    aria-pressed={terminalOpen}
-                    title="Toggle terminal (Ctrl+`)"
-                    className={cn(
-                      "flex shrink-0 items-center gap-1.5 px-2.5 text-xs outline-none hover:text-(--ws-fg) focus-visible:ring-1 focus-visible:ring-(--ws-accent) focus-visible:ring-inset",
-                      terminalOpen ? "text-(--ws-fg)" : "text-(--ws-muted)",
-                    )}
-                  >
-                    <SquareTerminal className="size-3.5" />
-                    Terminal
-                  </button>
-                  <EditorSettingsPopover settings={settings} onChange={changeSettings} />
-                </div>
-
-                <div className="min-h-0 flex-1">
-                  {activePath ? (
-                    <MonacoEditor
-                      // One Monaco model per playground file; it keeps edits while switching tabs.
-                      path={modelUri(activePath)}
-                      language={languageForPath(activePath)}
-                      defaultValue={initialContents.get(activePath) ?? ""}
-                      onChange={(value) => handleChange(activePath, value)}
-                      onEditorMount={resetLeftoverModels}
-                      themeId={theme.id}
-                      fontFamily={fontFamily}
-                      fontSize={settings.fontSize}
-                    />
-                  ) : (
-                    <div className="flex h-full items-center justify-center text-sm text-(--ws-muted)">
-                      Select a file in the explorer to start editing.
+                            <button
+                              type="button"
+                              title={path}
+                              onClick={() => setActivePath(path)}
+                              className="flex h-full items-center gap-2 pr-1 outline-none"
+                            >
+                              <FileIcon path={path} className="size-3.5" />
+                              {name}
+                            </button>
+                            <button
+                              type="button"
+                              aria-label={`Close ${name}`}
+                              onClick={() => closeFile(path)}
+                              className={cn(
+                                "rounded p-0.5 outline-none hover:bg-(--ws-active) focus-visible:opacity-100",
+                                active ? "opacity-100" : "opacity-0 group-hover:opacity-100",
+                              )}
+                            >
+                              <X className="size-3.5" />
+                            </button>
+                          </div>
+                        );
+                      })}
                     </div>
-                  )}
-                </div>
-              </div>
-            </ResizablePanel>
-            <ResizableHandle className="bg-(--ws-border)" />
+                    {canPreview && (
+                      <button
+                        type="button"
+                        onClick={togglePreview}
+                        aria-pressed={previewOpen}
+                        title="Toggle preview"
+                        className={cn(
+                          "flex shrink-0 items-center gap-1.5 px-2.5 text-xs outline-none hover:text-(--ws-fg) focus-visible:ring-1 focus-visible:ring-(--ws-accent) focus-visible:ring-inset",
+                          previewOpen ? "text-(--ws-fg)" : "text-(--ws-muted)",
+                        )}
+                      >
+                        <MonitorPlay className="size-3.5" />
+                        Preview
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={toggleTerminal}
+                      aria-pressed={terminalOpen}
+                      title="Toggle terminal (Ctrl+`)"
+                      className={cn(
+                        "flex shrink-0 items-center gap-1.5 px-2.5 text-xs outline-none hover:text-(--ws-fg) focus-visible:ring-1 focus-visible:ring-(--ws-accent) focus-visible:ring-inset",
+                        terminalOpen ? "text-(--ws-fg)" : "text-(--ws-muted)",
+                      )}
+                    >
+                      <SquareTerminal className="size-3.5" />
+                      Terminal
+                    </button>
+                    <EditorSettingsPopover settings={settings} onChange={changeSettings} />
+                  </div>
 
-            <ResizablePanel
-              panelRef={terminalPanel}
-              defaultSize="0%"
-              minSize="10%"
-              collapsible
-              collapsedSize="0%"
-              onResize={handleTerminalResize}
-            >
-              <div className="flex h-full flex-col bg-(--ws-editor)">
-                <div className="flex h-8 shrink-0 items-center justify-between px-3">
-                  <span className="text-[11px] font-semibold tracking-wider text-(--ws-muted) uppercase">Terminal</span>
-                  <button
-                    type="button"
-                    aria-label="Close terminal"
-                    onClick={toggleTerminal}
-                    className="rounded p-0.5 text-(--ws-muted) outline-none hover:bg-(--ws-active) hover:text-(--ws-fg) focus-visible:ring-1 focus-visible:ring-(--ws-accent)"
-                  >
-                    <X className="size-3.5" />
-                  </button>
+                  <div className="min-h-0 flex-1">
+                    {activePath ? (
+                      <MonacoEditor
+                        // One Monaco model per playground file; it keeps edits while switching tabs.
+                        path={modelUri(activePath)}
+                        language={languageForPath(activePath)}
+                        defaultValue={initialContents.get(activePath) ?? ""}
+                        onChange={(value) => handleChange(activePath, value)}
+                        onEditorMount={resetLeftoverModels}
+                        themeId={theme.id}
+                        fontFamily={fontFamily}
+                        fontSize={settings.fontSize}
+                      />
+                    ) : (
+                      <div className="flex h-full items-center justify-center text-sm text-(--ws-muted)">
+                        Select a file in the explorer to start editing.
+                      </div>
+                    )}
+                  </div>
                 </div>
-                <div className="min-h-0 flex-1">
-                  {terminalStarted && <TerminalView getFiles={getFiles} fontFamily={fontFamily} theme={theme.terminal} />}
+              </ResizablePanel>
+              <ResizableHandle className="bg-(--ws-border)" />
+
+              <ResizablePanel
+                panelRef={terminalPanel}
+                defaultSize="0%"
+                minSize="10%"
+                collapsible
+                collapsedSize="0%"
+                onResize={handleTerminalResize}
+              >
+                <div className="flex h-full flex-col bg-(--ws-editor)">
+                  <div className="flex h-8 shrink-0 items-center justify-between px-3">
+                    <span className="text-[11px] font-semibold tracking-wider text-(--ws-muted) uppercase">Terminal</span>
+                    <button
+                      type="button"
+                      aria-label="Close terminal"
+                      onClick={toggleTerminal}
+                      className="rounded p-0.5 text-(--ws-muted) outline-none hover:bg-(--ws-active) hover:text-(--ws-fg) focus-visible:ring-1 focus-visible:ring-(--ws-accent)"
+                    >
+                      <X className="size-3.5" />
+                    </button>
+                  </div>
+                  <div className="min-h-0 flex-1">
+                    {terminalStarted && <TerminalView getFiles={getFiles} fontFamily={fontFamily} theme={theme.terminal} />}
+                  </div>
                 </div>
-              </div>
-            </ResizablePanel>
-          </ResizablePanelGroup>
-        </ResizablePanel>
-      </ResizablePanelGroup>
+              </ResizablePanel>
+            </ResizablePanelGroup>
+          </ResizablePanel>
+
+          {canPreview && (
+            <>
+              <ResizableHandle className="bg-(--ws-border)" />
+              <ResizablePanel
+                panelRef={previewPanel}
+                defaultSize={DEFAULT_PREVIEW_SIZE}
+                minSize="20%"
+                collapsible
+                collapsedSize="0%"
+                onResize={handlePreviewResize}
+              >
+                <PreviewPanel
+                  state={preview.state}
+                  version={preview.version}
+                  onRun={preview.run}
+                  onStop={preview.stop}
+                  onReload={preview.reload}
+                  onClose={togglePreview}
+                />
+              </ResizablePanel>
+            </>
+          )}
+        </ResizablePanelGroup>
+        <StatusBar
+          previewStatus={canPreview ? preview.state.status : null}
+          activePath={activePath}
+          themeName={theme.name}
+        />
+      </div>
 
       <LeaveDialog
         open={leaveDestination !== null}
