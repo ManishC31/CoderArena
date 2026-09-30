@@ -24,8 +24,9 @@ Browser                         Next.js app                          Docker host
   development they come from a separate port (see [Development](#development-macos-windows-or-linux-without-gvisor)).
 - **Images**: `sandbox/images/<template>/`, built as `coderarena/sandbox-<template>`, with the
   template's dependencies baked in. React uses `openeuler/react`. Docker Hub has no official
-  Next.js image, so Next.js uses the official `node` image (current LTS, Debian slim), as
-  Next.js's own Docker example does.
+  Next.js, Vue or TypeScript image, so those use the official `node` image (current LTS,
+  Debian slim), as Next.js's own Docker example does. React, Vue and TypeScript run Vite's
+  dev server through the image's `serve.mjs`.
 
 ## Development (macOS, Windows, or Linux without gVisor)
 
@@ -106,5 +107,5 @@ appear in the editor.
   (Next.js: `next/link` and `next/image` add it; plain `<img>` and `fetch` don't).
 - Sandbox bookkeeping (activity, uploaded files) lives in the Next.js process. Run one app
   instance per sandbox host.
-- Only the React and Next.js templates run so far. To add one, create
+- Only the React, Next.js, Vue and TypeScript templates run so far. To add one, create
   `sandbox/images/<template>/` and add it to `IMAGES` in `src/lib/sandbox/sandbox.ts`.
