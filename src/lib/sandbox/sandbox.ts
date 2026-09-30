@@ -23,6 +23,8 @@ type SandboxImage = {
 const IMAGES: Partial<Record<PlaygroundTemplate, SandboxImage>> = {
   react: { image: "coderarena/sandbox-react", port: 5173, entry: "index.html" },
   nextjs: { image: "coderarena/sandbox-nextjs", port: 3000, entry: "" },
+  vue: { image: "coderarena/sandbox-vue", port: 5173, entry: "index.html" },
+  typescript: { image: "coderarena/sandbox-typescript", port: 5173, entry: "index.html" },
 };
 
 // Previews are served under PREVIEW_PATH/<token>/; the unguessable token is the only credential.

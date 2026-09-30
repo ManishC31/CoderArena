@@ -252,6 +252,7 @@ export default defineConfig({
         path: "src/main.js",
         content: `import { createApp } from "vue";
 import App from "./App.vue";
+import "./style.css";
 
 createApp(App).mount("#app");
 `,
@@ -272,6 +273,94 @@ const count = ref(0);
 </template>
 `,
       },
+      { path: "src/style.css", content: baseCss },
+    ],
+  },
+
+  typescript: {
+    entry: "src/main.ts",
+    files: [
+      {
+        path: "package.json",
+        content: `{
+  "name": "typescript-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.0",
+    "vite": "^7.0.0"
+  }
+}
+`,
+      },
+      {
+        path: "tsconfig.json",
+        content: `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "strict": true,
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}
+`,
+      },
+      {
+        path: "index.html",
+        content: `<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>TypeScript playground</title>
+  </head>
+  <body>
+    <main>
+      <h1>Hello from TypeScript</h1>
+      <button id="counter" type="button"></button>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
+`,
+      },
+      {
+        path: "src/main.ts",
+        content: `import { setupCounter } from "./counter.ts";
+import "./style.css";
+
+setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
+`,
+      },
+      {
+        path: "src/counter.ts",
+        content: `export function setupCounter(button: HTMLButtonElement) {
+  let count = 0;
+
+  const render = () => {
+    button.textContent = \`Clicked \${count} times\`;
+  };
+
+  button.addEventListener("click", () => {
+    count += 1;
+    render();
+  });
+  render();
+}
+`,
+      },
+      { path: "src/style.css", content: baseCss },
     ],
   },
 

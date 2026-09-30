@@ -16,13 +16,14 @@ Users can instantly create coding playgrounds from predefined templates:
 - Next.js
 - Vue
 - Angular
+- TypeScript (no framework)
 - Express
 - Hono
 - Other frameworks and runtimes in the future
 
 The template list is defined in the project (`src/lib/sandbox-templates.ts`), which is the source of truth wherever this brief mentions playground templates.
 
-LeetCode-style algorithm problems are solved in a language rather than a framework template: **JavaScript, TypeScript, or Python** (see sections 7 and 19).
+LeetCode-style algorithm problems are solved in a language rather than a framework template: **JavaScript, TypeScript, or Python** (see sections 7 and 19). The TypeScript playground template is separate: a plain TypeScript web project with no framework.
 
 Each playground provides an isolated development environment running through Docker-based infrastructure. Users can write code in a Monaco-style editor, run their application, and see the result through a realtime preview.
 
@@ -223,6 +224,7 @@ Show:
 - Next.js
 - Vue
 - Angular
+- TypeScript
 - Express
 - Hono
 
@@ -435,6 +437,7 @@ Provide template cards:
 - Next.js
 - Vue
 - Angular
+- TypeScript
 - Express
 - Hono
 
@@ -483,6 +486,7 @@ Template categories:
 - React
 - Vue
 - Angular
+- TypeScript
 
 ### Full-stack
 
@@ -493,7 +497,7 @@ Template categories:
 - Express
 - Hono
 
-These are the templates defined in the project (`src/lib/sandbox-templates.ts`). JavaScript, TypeScript, and Python are not playground templates; they are the languages for algorithm problems (section 19).
+These are the templates defined in the project (`src/lib/sandbox-templates.ts`). The TypeScript template is a plain TypeScript web project (Vite, no framework). JavaScript and Python are not playground templates; like TypeScript, they are languages for algorithm problems (section 19).
 
 Each template should display:
 
