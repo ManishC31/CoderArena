@@ -4,6 +4,7 @@ import {
   siHono,
   siNextdotjs,
   siReact,
+  siTypescript,
   siVuedotjs,
   type SimpleIcon,
 } from "simple-icons";
@@ -51,6 +52,14 @@ export const sandboxTemplates: SandboxTemplate[] = [
     description: "Batteries-included web framework",
     category: "Frontend",
     icon: siAngular,
+  },
+  {
+    id: "typescript",
+    name: "TypeScript",
+    description: "Typed JavaScript, no framework",
+    category: "Frontend",
+    icon: siTypescript,
+    color: "#3178C6",
   },
   {
     id: "express",
