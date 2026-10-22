@@ -333,7 +333,6 @@ Design a clean authentication experience.
 Support:
 
 - Email/password
-- Google
 - GitHub
 
 The GitHub authentication flow should clearly explain that GitHub authorization is required for repository-related functionality.
@@ -346,7 +345,6 @@ Example:
 Welcome back
 
 Continue with GitHub
-Continue with Google
 
 ----------------
 

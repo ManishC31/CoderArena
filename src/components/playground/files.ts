@@ -1,3 +1,7 @@
+// Limits on a playground's files, checked when they're saved or run.
+export const MAX_FILES = 200;
+export const MAX_FILE_LENGTH = 500_000;
+
 export type PlaygroundFile = {
   // Relative to the project root, e.g. "src/App.jsx".
   path: string;

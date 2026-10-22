@@ -1,0 +1,39 @@
+// Indexing for repository chat: idle until the user indexes it, then indexing → indexed (or failed).
+enum RepoIndexStatus {
+  idle
+  indexing
+  indexed
+  failed
+
+  @@map("repo_index_status")
+}
+
+// A GitHub repository the user can reach with their connected account, saved by "Sync from
+// GitHub" on /github. Indexing it (src/lib/inngest/functions.ts) stores its code's embeddings
+// in Pinecone, under the namespace from pineconeNamespace() in src/lib/ai/pinecone.ts.
+model GithubRepository {
+  id            String            @id @default(cuid())
+  userId        String            @map("user_id")
+  user          User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  githubId      BigInt            @map("github_id")
+  // "owner/name"
+  fullName      String            @map("full_name")
+  name          String
+  owner         String
+  description   String?
+  defaultBranch String            @map("default_branch")
+  private       Boolean           @default(false)
+  // Last push on GitHub, shown as "Updated …".
+  pushedAt      DateTime?         @map("pushed_at")
+  indexStatus   RepoIndexStatus   @default(idle) @map("index_status")
+  indexedAt     DateTime?         @map("indexed_at")
+  // Files embedded by the last successful index.
+  fileCount     Int               @default(0) @map("file_count")
+  messages      RepoChatMessage[]
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  @@unique([userId, githubId])
+  @@index([userId])
+  @@map("github_repository")
+}

@@ -1,7 +1,7 @@
 // How the user first signed up. Linking another method later doesn't change it.
 enum AuthType {
   email
-  google
+  github
 
   @@map("auth_type")
 }
@@ -29,6 +29,7 @@ model User {
   accounts      Account[]
   playgrounds   Playground[]
   editorConfig  EditorConfig?
+  repositories  GithubRepository[]
 
   @@map("user")
 }

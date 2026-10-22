@@ -1,36 +1,57 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CoderArena
 
-## Getting Started
+Browser-based playgrounds that run in isolated sandboxes, your GitHub repositories, and an AI chat that answers questions about your code.
 
-First, run the development server:
+- **Playgrounds**: pick a template (React, Next.js, Vue, Angular, TypeScript, …), edit in the browser and preview it running in a Docker + gVisor sandbox.
+- **GitHub** (`/github`): connect your account, sync your repositories, open any of them in a playground. Public repositories can also be imported by URL from the dashboard without connecting.
+- **Chat** (`/chat`): index a repository, then ask how its code works. Answers cite the files they come from.
+
+## Stack
+
+- Next.js (App Router), Tailwind CSS, shadcn/ui (Base UI)
+- Better Auth: email & password or GitHub (an email account can link GitHub later)
+- PostgreSQL with Prisma for everything: users, playgrounds, synced repositories, chat history
+- Inngest for background indexing; OpenAI embeddings and answers; Pinecone for vectors
+- Docker + gVisor sandboxes (see `sandbox/README.md`)
+
+## Setup
+
+1. Copy `.env.example` to `.env` and fill it in. You need:
+   - `DATABASE_URL`: a PostgreSQL database
+   - `BETTER_AUTH_SECRET` / `BETTER_AUTH_URL`
+   - `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET`: a GitHub OAuth app whose callback URL is `{BETTER_AUTH_URL}/api/auth/callback/github`
+   - `OPENAI_API_KEY`, `PINECONE_API_KEY`, `PINECONE_INDEX`: the Pinecone index must use **512 dimensions**
+2. Install and migrate:
+
+   ```bash
+   npm install
+   npm run db:migrate
+   ```
+
+3. For playground previews, start the sandbox host and build its images (see `sandbox/README.md`):
+
+   ```bash
+   npm run sandbox:host
+   npm run sandbox:build
+   ```
+
+## Run
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npx inngest-cli@latest dev   # in a second terminal, for repository indexing
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open http://localhost:3000.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## How the GitHub pieces fit
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+| What | Where |
+| --- | --- |
+| GitHub token lookup, repository listing | `src/lib/github.ts` |
+| Repository → playground import (tarball download, template detection) | `src/lib/github-import.ts`, `importRepository` in `src/app/(app)/playground/actions.ts` |
+| Sync and indexing actions | `src/app/(app)/(shell)/github/actions.ts` |
+| Indexing job (GitHub → chunks → OpenAI embeddings → Pinecone) | `src/lib/inngest/functions.ts` |
+| Chat endpoint (retrieval + streamed answer) | `src/app/api/chat/route.ts`, prompt in `src/lib/ai/prompt.ts` |
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Imported playgrounds hold up to 200 text files (lockfiles, binaries and build output are left out), and the sandbox picks its template from the repository's `package.json`.

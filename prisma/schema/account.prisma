@@ -1,4 +1,4 @@
-// One row per sign-in method: providerId is "credential" (email & password) or "google".
+// One row per sign-in method: providerId is "credential" (email & password) or "github".
 model Account {
   id                    String    @id
   accountId             String    @map("account_id")

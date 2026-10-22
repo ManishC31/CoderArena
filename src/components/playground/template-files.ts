@@ -394,6 +394,66 @@ setupCounter(document.querySelector<HTMLButtonElement>("#counter")!);
 `,
       },
       {
+        path: "angular.json",
+        content: `{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "projects": {
+    "angular-playground": {
+      "projectType": "application",
+      "root": "",
+      "sourceRoot": "src",
+      "prefix": "app",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "src/main.ts",
+            "index": "src/index.html",
+            "tsConfig": "tsconfig.json",
+            "styles": ["src/styles.css"]
+          },
+          "configurations": {
+            "development": {
+              "optimization": false,
+              "extractLicenses": false,
+              "sourceMap": true
+            }
+          }
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "options": {
+            "buildTarget": "angular-playground:build:development"
+          }
+        }
+      }
+    }
+  }
+}
+`,
+      },
+      {
+        path: "tsconfig.json",
+        content: `{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "preserve",
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "experimentalDecorators": true,
+    "importHelpers": true
+  },
+  "angularCompilerOptions": {
+    "strictTemplates": true,
+    "strictInjectionParameters": true
+  },
+  "files": ["src/main.ts"]
+}
+`,
+      },
+      {
         path: "src/index.html",
         content: `<!doctype html>
 <html lang="en">
@@ -428,15 +488,20 @@ bootstrapApplication(AppComponent, {
   template: \`
     <main>
       <h1>Hello from Angular</h1>
-      <button (click)="count.update((c) => c + 1)">Clicked {{ count() }} times</button>
+      <button (click)="increment()">Clicked {{ count() }} times</button>
     </main>
   \`,
 })
 export class AppComponent {
   count = signal(0);
+
+  increment() {
+    this.count.update((c) => c + 1);
+  }
 }
 `,
       },
+      { path: "src/styles.css", content: baseCss },
     ],
   },
 

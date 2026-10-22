@@ -19,6 +19,9 @@ model Playground {
   template    PlaygroundTemplate
   // Starred by its owner, so it can be pinned to the top of their list.
   starred     Boolean            @default(false)
+  // Set when the playground was imported from GitHub: "owner/name" and the branch it came from.
+  githubRepo   String?           @map("github_repo")
+  githubBranch String?           @map("github_branch")
   userId      String             @map("user_id")
   user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
   files       PlaygroundFile[]

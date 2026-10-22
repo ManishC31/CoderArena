@@ -31,7 +31,7 @@ export default async function DashboardPage() {
       where: { userId: user.id },
       orderBy: [{ starred: "desc" }, { updatedAt: "desc" }],
       take: RECENT_COUNT,
-      select: { id: true, title: true, description: true, template: true, starred: true, updatedAt: true },
+      select: { id: true, title: true, description: true, template: true, githubRepo: true, starred: true, updatedAt: true },
     }),
     prisma.playground.count({ where: { userId: user.id } }),
   ]);

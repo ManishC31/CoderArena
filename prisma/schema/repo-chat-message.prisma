@@ -1,0 +1,22 @@
+enum ChatRole {
+  user
+  assistant
+
+  @@map("chat_role")
+}
+
+// The chat about one repository (/chat/[repoId]). A repository belongs to one user, so this
+// is that user's conversation with it.
+model RepoChatMessage {
+  id           String           @id @default(cuid())
+  repositoryId String           @map("repository_id")
+  repository   GithubRepository @relation(fields: [repositoryId], references: [id], onDelete: Cascade)
+  role         ChatRole
+  content      String
+  // Files the answer drew on: [{ path, chunk }]. Empty for the user's messages.
+  citations    Json             @default("[]")
+  createdAt    DateTime         @default(now()) @map("created_at")
+
+  @@index([repositoryId, createdAt])
+  @@map("repo_chat_message")
+}

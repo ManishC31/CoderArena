@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
-import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { GithubSignInButton } from "@/components/auth/github-sign-in-button";
 import { OrDivider } from "@/components/auth/or-divider";
 import { Button } from "@/components/ui/button";
 import {
@@ -60,7 +60,7 @@ export function SignupForm({ callbackUrl }: { callbackUrl: string }) {
       </CardHeader>
 
       <CardContent className="grid gap-5">
-        <GoogleSignInButton callbackUrl={callbackUrl} onError={setError} />
+        <GithubSignInButton callbackUrl={callbackUrl} onError={setError} />
         <OrDivider />
 
         <form onSubmit={handleSubmit} className="grid gap-4">
