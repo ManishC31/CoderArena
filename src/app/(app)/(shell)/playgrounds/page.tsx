@@ -18,7 +18,7 @@ export default async function PlaygroundsPage() {
   const playgrounds = await prisma.playground.findMany({
     where: { userId: user.id },
     orderBy: [{ starred: "desc" }, { updatedAt: "desc" }],
-    select: { id: true, title: true, description: true, template: true, starred: true, updatedAt: true },
+    select: { id: true, title: true, description: true, template: true, githubRepo: true, starred: true, updatedAt: true },
   });
 
   return (

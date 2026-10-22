@@ -4,7 +4,7 @@ import { useState, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { LoaderCircle } from "lucide-react";
-import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
+import { GithubSignInButton } from "@/components/auth/github-sign-in-button";
 import { OrDivider } from "@/components/auth/or-divider";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,14 +22,14 @@ import { withCallbackUrl } from "@/lib/routes";
 
 type Props = {
   callbackUrl: string;
-  // Set when Google sign-in fails and Better Auth sends the user back here.
+  // Set when GitHub sign-in fails and Better Auth sends the user back here.
   oauthError?: string;
 };
 
 export function LoginForm({ callbackUrl, oauthError }: Props) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(
-    oauthError ? "Google sign-in didn't complete. Please try again." : null,
+    oauthError ? "GitHub sign-in didn't complete. Please try again." : null,
   );
   const [pending, setPending] = useState(false);
 
@@ -62,7 +62,7 @@ export function LoginForm({ callbackUrl, oauthError }: Props) {
       </CardHeader>
 
       <CardContent className="grid gap-5">
-        <GoogleSignInButton callbackUrl={callbackUrl} onError={setError} />
+        <GithubSignInButton callbackUrl={callbackUrl} onError={setError} />
         <OrDivider />
 
         <form onSubmit={handleSubmit} className="grid gap-4">

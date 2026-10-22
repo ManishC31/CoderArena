@@ -12,6 +12,8 @@ export type PlaygroundSummary = {
   title: string;
   description: string | null;
   template: PlaygroundTemplate;
+  // "owner/name" when imported from GitHub.
+  githubRepo: string | null;
   starred: boolean;
   updatedAt: Date;
 };
@@ -36,8 +38,8 @@ export function PlaygroundCard({ playground }: { playground: PlaygroundSummary }
             </Link>
           </h3>
           {template && (
-            <p className="text-xs text-muted-foreground">
-              {template.name} · {template.category}
+            <p className="truncate text-xs text-muted-foreground">
+              {template.name} · {playground.githubRepo ?? template.category}
             </p>
           )}
         </div>

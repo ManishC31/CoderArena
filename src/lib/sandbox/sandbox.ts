@@ -14,9 +14,13 @@ type SandboxImage = {
   image: string;
   // Port the dev server listens on inside the container.
   port: number;
-  // The preview page, relative to the preview base. Vite serves index.html there; Next.js
-  // serves the base path itself ("").
+  // The preview page, relative to the preview base. Vite and Angular serve index.html there;
+  // Next.js serves the base path itself ("").
   entry: string;
+  // The dev server rebuilds when files change and serves the previous build meanwhile
+  // (Angular), rather than building each request. Updates wait for the rebuild through the
+  // image's wait-for-rebuild.sh, which prints the errors when it fails.
+  buildsOnChange?: boolean;
 };
 
 // Templates that can run in a sandbox.
@@ -25,6 +29,7 @@ const IMAGES: Partial<Record<PlaygroundTemplate, SandboxImage>> = {
   nextjs: { image: "coderarena/sandbox-nextjs", port: 3000, entry: "" },
   vue: { image: "coderarena/sandbox-vue", port: 5173, entry: "index.html" },
   typescript: { image: "coderarena/sandbox-typescript", port: 5173, entry: "index.html" },
+  angular: { image: "coderarena/sandbox-angular", port: 4200, entry: "index.html", buildsOnChange: true },
 };
 
 // Previews are served under PREVIEW_PATH/<token>/; the unguessable token is the only credential.
@@ -48,6 +53,10 @@ const MAX_PROCESSES = "256";
 const MAX_PER_USER = 2;
 const MAX_SANDBOXES = Math.min(20, PORT_RANGE ? PORT_RANGE.end - PORT_RANGE.start + 1 : Infinity);
 const IDLE_TIMEOUT_MS = 15 * 60_000;
+// A dev server exits with this when its first build fails (Angular's serve.mjs), so the
+// run reports a build error rather than a crash.
+const FIRST_BUILD_FAILED_EXIT_CODE = 3;
+const BUILD_FAILED_MESSAGE = "The build failed. Fix the errors to update the preview.";
 // Enforced inside the container, so it holds even if the app isn't around to stop it.
 const MAX_LIFETIME_SECONDS = 2 * 60 * 60;
 // Long enough for an npm install when a playground changes its dependencies.
@@ -82,6 +91,8 @@ type Upload = {
   hashes: Map<string, string>;
   // The dependencies it was started with, from dependencies().
   dependencies?: string;
+  // The latest build's errors, when it failed (images that build on change).
+  buildErrors?: string;
 };
 
 type State = {
@@ -305,22 +316,30 @@ async function makeRoom(userId: string) {
 }
 
 // Uploads the files that changed since the last upload and deletes the ones that are gone.
-// The first upload also tells the container to start its dev server.
+// The first upload also tells the container to start its dev server. Fails with the build's
+// errors when the dev server rebuilds on change and that failed.
 async function uploadFiles(sandbox: Sandbox, files: PlaygroundFile[], { first = false } = {}) {
   const hashes = new Map(files.map((file) => [file.path, hash(file.content)]));
   const previous = first ? undefined : state.uploads.get(sandbox.name);
   const changed = previous ? files.filter((file) => previous.hashes.get(file.path) !== hashes.get(file.path)) : files;
   const deleted = previous ? [...previous.hashes.keys()].filter((path) => !hashes.has(path)) : [];
+  const waitForBuild = !first && IMAGES[sandbox.template ?? "react"]?.buildsOnChange;
 
+  let buildErrors = previous?.buildErrors;
   if (first || changed.length > 0 || deleted.length > 0) {
     // --touch gives each file a new mtime. tar would restore the old one (to the second),
     // and Vite's watcher ignores changes that keep it.
-    const script = `cd /workspace && rm -f -- "$@" && tar --touch -x -f -${first ? " && touch /tmp/coderarena-ready" : ""}`;
-    await docker(["exec", "--interactive", sandbox.name, "sh", "-c", script, "sh", ...deleted], {
+    const extract = `rm -f -- "$@" && tar --touch -x -f -`;
+    let script = `cd /workspace && ${extract}`;
+    if (first) script += " && touch /tmp/coderarena-ready";
+    else if (waitForBuild) script = `cd /workspace && /opt/coderarena/wait-for-rebuild.sh sh -c '${extract}' sh "$@"`;
+    const output = await docker(["exec", "--interactive", sandbox.name, "sh", "-c", script, "sh", ...deleted], {
       input: createTar(changed),
     });
+    buildErrors = (waitForBuild && output.trim()) || undefined;
   }
-  state.uploads.set(sandbox.name, { hashes, dependencies: previous?.dependencies ?? dependencies(files) });
+  state.uploads.set(sandbox.name, { hashes, dependencies: previous?.dependencies ?? dependencies(files), buildErrors });
+  if (buildErrors) throw new SandboxError(BUILD_FAILED_MESSAGE, buildErrors);
 }
 
 // Waits until the dev server answers. Fails with the container's output if it stops first
@@ -337,7 +356,11 @@ async function waitUntilReady(sandbox: Sandbox) {
       // Not listening yet.
     }
     if (attempt % 5 === 0 && !(await isRunning(sandbox.name))) {
-      throw new SandboxError("The dev server stopped while starting.", await readLogs(sandbox.name));
+      const buildFailed = (await exitCode(sandbox.name)) === FIRST_BUILD_FAILED_EXIT_CODE;
+      throw new SandboxError(
+        buildFailed ? BUILD_FAILED_MESSAGE : "The dev server stopped while starting.",
+        await readLogs(sandbox.name),
+      );
     }
     await new Promise((resolve) => setTimeout(resolve, 300));
   }
@@ -436,6 +459,15 @@ async function isRunning(name: string) {
     return (await docker(["inspect", "--format", "{{.State.Running}}", name])).trim() === "true";
   } catch {
     return false;
+  }
+}
+
+// How a stopped container's main process exited.
+async function exitCode(name: string) {
+  try {
+    return Number(await docker(["inspect", "--format", "{{.State.ExitCode}}", name]));
+  } catch {
+    return undefined;
   }
 }
 

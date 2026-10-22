@@ -8,7 +8,7 @@ The editor's **Preview** panel shows the app running inside it.
 Browser                         Next.js app                          Docker host (runsc)
 ┌──────────────────────┐        ┌──────────────────────────────┐     ┌──────────────────────────┐
 │ Editor ──────────────┼─action─▶ runPlayground()              │     │ coderarena-sandbox-<id>  │
-│                      │        │  src/lib/sandbox/sandbox.ts ─┼─CLI─▶  Vite / Next.js dev srv  │
+│                      │        │  src/lib/sandbox/sandbox.ts ─┼─CLI─▶  playground's dev server │
 │ Preview <iframe> ────┼─HTTP───▶ /api/sandbox/preview/<token>/┼─HTTP▶  (published host port)   │
 └──────────────────────┘        └──────────────────────────────┘     └──────────────────────────┘
 ```
@@ -19,14 +19,15 @@ Browser                         Next.js app                          Docker host
   Changing dependencies in `package.json` restarts the sandbox, which runs `npm install`.
 - **Preview**: `src/lib/sandbox/preview-proxy.ts` proxies requests to the container's
   published port. The dev server runs under that path: Vite with `base`, Next.js with
-  `basePath` (see [Next.js playgrounds](#nextjs-playgrounds)). Production serves previews
+  `basePath` (see [Next.js playgrounds](#nextjs-playgrounds)), Angular with `--serve-path`
+  (see [Angular playgrounds](#angular-playgrounds)). Production serves previews
   from the app's route, `src/app/api/sandbox/preview/[token]/[[...path]]/route.ts`; in
   development they come from a separate port (see [Development](#development-macos-windows-or-linux-without-gvisor)).
 - **Images**: `sandbox/images/<template>/`, built as `coderarena/sandbox-<template>`, with the
   template's dependencies baked in. React uses `openeuler/react`. Docker Hub has no official
-  Next.js, Vue or TypeScript image, so those use the official `node` image (current LTS,
-  Debian slim), as Next.js's own Docker example does. React, Vue and TypeScript run Vite's
-  dev server through the image's `serve.mjs`.
+  Next.js, Vue, TypeScript or Angular image, so those use the official `node` image (current
+  LTS, Debian slim), as Next.js's own Docker example does. React, Vue and TypeScript run
+  Vite's dev server through the image's `serve.mjs`.
 
 ## Development (macOS, Windows, or Linux without gVisor)
 
@@ -95,6 +96,25 @@ A playground without a Next.js config gets `sandbox/images/nextjs/next.config.mj
 settings. Next.js writes `tsconfig.json` and `next-env.d.ts` inside the sandbox; they don't
 appear in the editor.
 
+## Angular playgrounds
+
+`ng serve` runs with `--serve-path` set to the preview path, and without live reload or HMR.
+Unlike Vite and Next.js, which compile what the page requests, Angular rebuilds when files
+change and serves the previous build until the new one is ready. So:
+
+- `sandbox/images/angular/serve.mjs` runs `ng serve` and records each build's start and
+  result in `/tmp/coderarena-build`.
+- After the first upload, `uploadFiles` runs the upload through `wait-for-rebuild.sh`, which
+  returns once the rebuild the change started is done. A change to a file outside the build
+  (e.g. `README.md`) starts none; the script stops waiting after a second.
+- A failed rebuild shows "The build failed" in the preview panel with the compiler's errors
+  until an edit fixes it. If the first build fails, the dev server never starts, so
+  `serve.mjs` exits and the run fails with the errors.
+
+A playground without `angular.json` or `tsconfig.json` gets the ones in
+`sandbox/images/angular/`, the template's without its global stylesheet. `ng serve` reads
+`angular.json` only as it starts: changes to it apply after **Stop** and **Run**.
+
 ## Limitations
 
 - No hot module replacement: the proxy only speaks HTTP, so the preview reloads fully after
@@ -107,5 +127,5 @@ appear in the editor.
   (Next.js: `next/link` and `next/image` add it; plain `<img>` and `fetch` don't).
 - Sandbox bookkeeping (activity, uploaded files) lives in the Next.js process. Run one app
   instance per sandbox host.
-- Only the React, Next.js, Vue and TypeScript templates run so far. To add one, create
+- Only the React, Next.js, Vue, TypeScript and Angular templates run so far. To add one, create
   `sandbox/images/<template>/` and add it to `IMAGES` in `src/lib/sandbox/sandbox.ts`.

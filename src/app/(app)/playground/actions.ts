@@ -3,9 +3,11 @@
 import { refresh } from "next/cache";
 import { redirect } from "next/navigation";
 import { validateEditorSettings } from "@/components/playground/editor-settings";
-import { isValidFilePath, type PlaygroundFile } from "@/components/playground/files";
+import { isValidFilePath, MAX_FILE_LENGTH, MAX_FILES, type PlaygroundFile } from "@/components/playground/files";
 import { templateFiles } from "@/components/playground/template-files";
 import { saveEditorSettings } from "@/lib/editor-config";
+import { getGithubToken, parseRepoReference } from "@/lib/github";
+import { fetchRepository, ImportError } from "@/lib/github-import";
 import { prisma } from "@/lib/prisma";
 import { previewOrigin } from "@/lib/sandbox/preview-server";
 import { runSandbox, SandboxError, stopSandbox } from "@/lib/sandbox/sandbox";
@@ -35,6 +37,46 @@ export async function createPlayground(
   // Saved with the template's starter files, so its files are in the database from the start.
   const playground = await prisma.playground.create({
     data: { title, template: template.id, userId: user.id, files: { create: templateFiles[template.id].files } },
+    select: { id: true },
+  });
+
+  redirect(`/playground/${playground.id}`);
+}
+
+export type ImportRepositoryState = { error: string } | null;
+
+// Copies a GitHub repository's files into a new playground for the signed-in user and opens
+// it in the editor. Public repositories work without a connected GitHub account; private ones
+// use the account's token. The template (and so the sandbox) is picked from package.json.
+export async function importRepository(
+  _previousState: ImportRepositoryState,
+  formData: FormData,
+): Promise<ImportRepositoryState> {
+  const { user } = await requireSession();
+
+  const reference = parseRepoReference(String(formData.get("repository") ?? ""));
+  if (!reference) return { error: "Enter a GitHub URL like https://github.com/owner/repository." };
+  const branch = String(formData.get("branch") ?? "").trim();
+
+  let repository;
+  try {
+    const token = await getGithubToken(user.id).catch(() => null);
+    repository = await fetchRepository({ ...reference, branch, token });
+  } catch (error) {
+    if (error instanceof ImportError) return { error: error.message };
+    console.error("Couldn't import the repository", error);
+    return { error: "Couldn't import the repository. Please try again." };
+  }
+
+  const playground = await prisma.playground.create({
+    data: {
+      title: repository.fullName.slice(0, MAX_TITLE_LENGTH),
+      template: repository.template,
+      githubRepo: repository.fullName,
+      githubBranch: repository.branch,
+      userId: user.id,
+      files: { create: repository.files },
+    },
     select: { id: true },
   });
 
@@ -93,9 +135,6 @@ export async function deletePlayground(playgroundId: string) {
   }
   refresh();
 }
-
-const MAX_FILES = 200;
-const MAX_FILE_LENGTH = 500_000;
 
 function isValidFileList(files: PlaygroundFile[]) {
   return (

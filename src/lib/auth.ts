@@ -12,10 +12,19 @@ export const auth = betterAuth({
     enabled: true,
   },
   socialProviders: {
-    // Authorized redirect URI in Google Cloud Console: {BETTER_AUTH_URL}/api/auth/callback/google
-    google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    // Authorization callback URL in the GitHub OAuth app: {BETTER_AUTH_URL}/api/auth/callback/github
+    // "repo" lets the app read private repositories (import into playgrounds, index for chat).
+    github: {
+      clientId: process.env.GITHUB_CLIENT_ID as string,
+      clientSecret: process.env.GITHUB_CLIENT_SECRET as string,
+      scope: ["user:email", "repo"],
+    },
+  },
+  account: {
+    accountLinking: {
+      enabled: true,
+      // "Connect GitHub" links the GitHub account to the signed-in user, whatever its email.
+      allowDifferentEmails: true,
     },
   },
   user: {
@@ -29,7 +38,7 @@ export const auth = betterAuth({
         input: false,
       },
       authType: {
-        type: ["email", "google"],
+        type: ["email", "github"],
         required: true,
         defaultValue: "email",
         input: false,
@@ -39,12 +48,12 @@ export const auth = betterAuth({
   databaseHooks: {
     user: {
       create: {
-        // Record the sign-up method. Google arrives via the OAuth callback (/callback/:id)
+        // Record the sign-up method. GitHub arrives via the OAuth callback (/callback/:id)
         // or an ID-token sign-in (body.provider); everything else is email & password.
         before: async (user, ctx) => {
           const provider = ctx?.params?.id ?? ctx?.body?.provider;
           return {
-            data: { ...user, authType: provider === "google" ? "google" : "email" },
+            data: { ...user, authType: provider === "github" ? "github" : "email" },
           };
         },
       },
