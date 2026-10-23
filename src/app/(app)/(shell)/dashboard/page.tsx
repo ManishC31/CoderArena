@@ -1,11 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight, Plus } from "lucide-react";
-import { siGithub } from "simple-icons";
-import { BrandIcon } from "@/components/brand-icon";
 import { CreatePlaygroundDialog } from "@/components/dashboard/create-playground-dialog";
 import { Greeting } from "@/components/dashboard/greeting";
-import { OpenRepositoryDialog } from "@/components/dashboard/open-repository-dialog";
 import { PlaygroundCard } from "@/components/dashboard/playground-card";
 import { PlaygroundsEmpty } from "@/components/dashboard/playgrounds-empty";
 import { PracticeTeaser } from "@/components/dashboard/practice-teaser";
@@ -43,24 +40,14 @@ export default async function DashboardPage() {
           <Greeting name={firstName} />
           <p className="mt-1 text-muted-foreground">Continue where you left off or start something new.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <OpenRepositoryDialog
-            trigger={
-              <Button variant="outline">
-                <BrandIcon icon={siGithub} className="size-4" />
-                Import from GitHub
-              </Button>
-            }
-          />
-          <CreatePlaygroundDialog
-            trigger={
-              <Button>
-                <Plus />
-                New playground
-              </Button>
-            }
-          />
-        </div>
+        <CreatePlaygroundDialog
+          trigger={
+            <Button>
+              <Plus />
+              New playground
+            </Button>
+          }
+        />
       </header>
 
       <div className="mt-10 grid gap-10 lg:grid-cols-[minmax(0,1fr)_20rem]">
