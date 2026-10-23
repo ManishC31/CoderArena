@@ -1,6 +1,6 @@
 import "server-only";
 import { createHash, randomBytes } from "node:crypto";
-import type { PlaygroundFile } from "@/components/playground/files";
+import { extensionOf, type PlaygroundFile } from "@/components/playground/files";
 import type { PlaygroundTemplate } from "@/generated/prisma/enums";
 import { docker, DockerError } from "@/lib/sandbox/docker";
 import { createTar } from "@/lib/sandbox/tar";
@@ -318,7 +318,8 @@ async function makeRoom(userId: string) {
 // Uploads the files that changed since the last upload and deletes the ones that are gone.
 // The first upload also tells the container to start its dev server. Fails with the build's
 // errors when the dev server rebuilds on change and that failed.
-async function uploadFiles(sandbox: Sandbox, files: PlaygroundFile[], { first = false } = {}) {
+async function uploadFiles(sandbox: Sandbox, playgroundFiles: PlaygroundFile[], { first = false } = {}) {
+  const files = sandbox.template === "nextjs" ? withPreviewNextConfig(playgroundFiles) : playgroundFiles;
   const hashes = new Map(files.map((file) => [file.path, hash(file.content)]));
   const previous = first ? undefined : state.uploads.get(sandbox.name);
   const changed = previous ? files.filter((file) => previous.hashes.get(file.path) !== hashes.get(file.path)) : files;
@@ -340,6 +341,46 @@ async function uploadFiles(sandbox: Sandbox, files: PlaygroundFile[], { first = 
   }
   state.uploads.set(sandbox.name, { hashes, dependencies: previous?.dependencies ?? dependencies(files), buildErrors });
   if (buildErrors) throw new SandboxError(BUILD_FAILED_MESSAGE, buildErrors);
+}
+
+// Next.js serves the preview under its base path only when next.config sets basePath. A
+// project's own config (e.g. an imported repository's) rarely does, so it's uploaded as
+// next.config.project.<ext> and wrapped by a next.config.mjs that adds basePath. The playground's
+// files stay as they are; only the sandbox's copy changes.
+const NEXT_CONFIG_EXTENSIONS = ["js", "mjs", "ts", "mts", "cjs"];
+
+function withPreviewNextConfig(files: PlaygroundFile[]): PlaygroundFile[] {
+  const isConfig = (path: string) => NEXT_CONFIG_EXTENSIONS.some((ext) => path === `next.config.${ext}`);
+  // .ts becomes .mts, so Node loads it as a module without warning about its type.
+  const projectPath = (ext: string) => `next.config.project.${ext === "ts" ? "mts" : ext}`;
+  // The one Next.js would load: the first in its lookup order.
+  const ext = NEXT_CONFIG_EXTENSIONS.find((ext) => files.some((file) => file.path === `next.config.${ext}`));
+  const project = ext && files.find((file) => file.path === `next.config.${ext}`);
+  const renamed = files.map((file) => (isConfig(file.path) ? { ...file, path: projectPath(extensionOf(file.path)) } : file));
+  const wrapper = previewNextConfig(project ? { path: projectPath(ext), content: project.content } : undefined);
+  return [...renamed, { path: "next.config.mjs", content: wrapper }];
+}
+
+function previewNextConfig(project?: { path: string; content: string }) {
+  return `// Written by CoderArena for the preview; your own config is in next.config.project.*.
+import { createRequire } from "node:module";
+${project ? `import project from "./${project.path}";\n// Project config version: ${hash(project.content)}` : "const project = {};"}
+
+// Next.js 16 waits for a WebSocket the preview can't open before the page becomes interactive.
+let nextMajor = 0;
+try {
+  nextMajor = Number(createRequire(import.meta.url)("next/package.json").version.split(".")[0]);
+} catch {}
+
+export default async function config(phase, context) {
+  const resolved = (typeof project === "function" ? await project(phase, context) : await project) ?? {};
+  return {
+    ...resolved,
+    basePath: process.env.PREVIEW_BASE_PATH,
+    ...(nextMajor >= 16 && { experimental: { ...resolved.experimental, reactDebugChannel: false } }),
+  };
+}
+`;
 }
 
 // Waits until the dev server answers. Fails with the container's output if it stops first
